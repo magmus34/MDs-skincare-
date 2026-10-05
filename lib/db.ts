@@ -1,29 +1,19 @@
-import fs from 'fs';
-import path from 'path';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+} from 'firebase/firestore';
+import { firestore, handleFirestoreError, OperationType } from './firebase';
 import { Product, Category, Order, StoreSettings, OFFICIAL_CATEGORIES } from './types';
 
-function getPrimaryDbPath(): string {
-  if (fs.existsSync('/app/applet/data/store.json')) {
-    return '/app/applet/data/store.json';
-  }
-  return path.join(process.cwd(), 'data', 'store.json');
-}
-
-function getKnownDbPaths(): string[] {
-  const primary = getPrimaryDbPath();
-  const backup = path.join('/tmp', 'md_store.json');
-  return Array.from(new Set([primary, backup]));
-}
-
-export interface DatabaseSchema {
-  products: Product[];
-  categories: Category[];
-  orders: Order[];
-  settings: StoreSettings;
-  adminPasswordHash: string;
-}
-
-const DEFAULT_SETTINGS: StoreSettings = {
+// Default initial data for fresh databases
+export const DEFAULT_SETTINGS: StoreSettings = {
   brandName: 'MD SKINCARE HAVEN',
   ownerWhatsApp: '+2349070938624',
   bankDetails: {
@@ -41,9 +31,9 @@ const DEFAULT_SETTINGS: StoreSettings = {
   },
 };
 
-const DEFAULT_CATEGORIES: Category[] = OFFICIAL_CATEGORIES;
+export const DEFAULT_CATEGORIES: Category[] = OFFICIAL_CATEGORIES;
 
-const DEFAULT_PRODUCTS: Product[] = [
+export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: 'prod-vit-c',
     name: 'Advanced 15% Vitamin C Glow Serum',
@@ -102,632 +92,455 @@ const DEFAULT_PRODUCTS: Product[] = [
     skinType: 'All Melanin Skin',
     createdAt: '2026-09-15T14:30:00.000Z',
   },
-  {
-    id: 'prod-barrier-cream',
-    name: 'Ceramide Barrier Recovery Cloud Cream',
-    slug: 'ceramide-barrier-recovery-cloud-cream',
-    price: 15500,
-    originalPrice: 18500,
-    description: 'Deep hydration restoration cream packed with 3 essential skin ceramides and squalane to heal the skin barrier.',
-    category: 'Face Moisturisers',
-    categorySlug: 'face-moisturisers',
-    stockQuantity: 25,
-    inStock: true,
-    featured: true,
-    isPopular: false,
-    imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=800&q=80',
-    badge: 'HYDRATION',
-    volume: '50g',
-    skinType: 'Dry & Sensitive',
-    createdAt: '2026-09-18T16:00:00.000Z',
-  },
-  {
-    id: 'prod-botanical-cleanser',
-    name: 'Purifying Botanical Gel Cleanser (pH 5.5)',
-    slug: 'purifying-botanical-gel-cleanser',
-    price: 11000,
-    originalPrice: 13500,
-    description: 'Gentle, refreshing foaming cleanser with chamomile and green tea that cleanses deeply without tight, dry feelings.',
-    category: 'Cleansers & Face Washes',
-    categorySlug: 'cleansers-face-washes',
-    stockQuantity: 45,
-    inStock: true,
-    featured: false,
-    isPopular: true,
-    imageUrl: 'https://images.unsplash.com/photo-1617897903246-719242758050?auto=format&fit=crop&w=800&q=80',
-    badge: 'GENTLE',
-    volume: '150ml',
-    skinType: 'All Skin Types',
-    createdAt: '2026-09-20T09:00:00.000Z',
-  },
-  {
-    id: 'prod-shea-body-butter',
-    name: 'Whipped Shea & Turmeric Body Glow Soufflé',
-    slug: 'whipped-shea-turmeric-body-glow-souffle',
-    price: 13000,
-    originalPrice: 16000,
-    description: 'Luxurious whipped raw Nigerian shea butter with golden turmeric extract to soften rough skin and boost body glow.',
-    category: 'Body Care, Scrubs & Soaps',
-    categorySlug: 'body-care-scrubs-soaps',
-    stockQuantity: 30,
-    inStock: true,
-    featured: true,
-    isPopular: true,
-    imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=800&q=80',
-    badge: 'BODY GLOW',
-    volume: '250g',
-    skinType: 'All Body Skin',
-    createdAt: '2026-09-22T08:00:00.000Z',
-  },
-  {
-    id: 'prod-glass-skin-bundle',
-    name: 'The Complete Glass Skin 4-Piece Daily Routine',
-    slug: 'the-complete-glass-skin-4-piece-routine',
-    price: 48000,
-    originalPrice: 59000,
-    description: 'Our most celebrated routine bundle! Includes our Purifying Gel Cleanser, Vitamin C Glow Serum, Melanin Shield SPF 50, and Cloud Cream.',
-    category: 'Bundles & Sets',
-    categorySlug: 'bundles-sets',
-    stockQuantity: 15,
-    inStock: true,
-    featured: true,
-    isPopular: true,
-    isNewArrival: true,
-    imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80',
-    badge: 'SAVE ₦11,000 BUNDLE',
-    volume: 'Complete 4-Piece Set',
-    skinType: 'All Skin Types',
-    createdAt: '2026-09-22T10:00:00.000Z',
-  },
 ];
 
-const DEFAULT_ORDERS: Order[] = [
-  {
-    id: 'MD-202610-8421',
-    customer: {
-      name: 'Chioma Adebayo',
-      location: 'Lekki Phase 1, Lagos',
-      whatsappNumber: '08023456789',
-    },
-    items: [
-      {
-        productId: 'prod-vit-c',
-        name: 'Advanced 15% Vitamin C Glow Serum',
-        price: 14500,
-        quantity: 2,
-        imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80',
-        subtotal: 29000,
-      },
-    ],
-    subtotal: 29000,
-    totalAmount: 29000,
-    status: 'Payment Confirmed',
-    paymentMethod: 'Bank Transfer',
-    bankDetails: {
-      bankName: 'Guaranty Trust Bank (GTBank)',
-      accountName: 'MD SKINCARE HAVEN NIGERIA',
-      accountNumber: '0812948210',
-    },
-    paymentProof: {
-      bankReference: 'GTB-TRX-9821847120',
-      senderName: 'Chioma Adebayo',
-      paidAt: '2026-10-01T14:22:00.000Z',
-    },
-    createdAt: '2026-10-01T14:15:00.000Z',
-    updatedAt: '2026-10-01T15:00:00.000Z',
-    adminNotes: 'Payment verified in GTBank app.',
-  },
-  {
-    id: 'MD-202610-9104',
-    customer: {
-      name: 'Dr. Amina Bello',
-      location: 'Gwarinpa Estate, Abuja',
-      whatsappNumber: '08139876543',
-    },
-    items: [
-      {
-        productId: 'prod-sunscreen-spf50',
-        name: 'Invisible Melanin Shield SPF 50+',
-        price: 16000,
-        quantity: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&w=800&q=80',
-        subtotal: 16000,
-      },
-    ],
-    subtotal: 16000,
-    totalAmount: 16000,
-    status: 'Pending Payment',
-    paymentMethod: 'Bank Transfer',
-    bankDetails: {
-      bankName: 'Guaranty Trust Bank (GTBank)',
-      accountName: 'MD SKINCARE HAVEN NIGERIA',
-      accountNumber: '0812948210',
-    },
-    createdAt: '2026-10-02T08:10:00.000Z',
-    updatedAt: '2026-10-02T08:10:00.000Z',
-  },
-];
-
-let inMemoryDb: DatabaseSchema | null = null;
-const TMP_FILE = path.join('/tmp', 'md_store.json');
-
-function normalizeDatabase(parsed: any): DatabaseSchema {
-  let needsWrite = false;
-
-  const BROKEN_IMG = 'photo-1608248597359-2c0993cfa32e';
-  const VALID_REPLACEMENT =
-    'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80';
-
-  if (parsed.products && Array.isArray(parsed.products)) {
-    parsed.products.forEach((p: any) => {
-      if (p.imageUrl && p.imageUrl.includes(BROKEN_IMG)) {
-        p.imageUrl = VALID_REPLACEMENT;
-        needsWrite = true;
+/**
+ * Removes undefined fields from objects before saving to Firestore,
+ * preventing 'Function setDoc() called with invalid data. Unsupported field value: undefined' errors.
+ */
+function cleanForFirestore<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = cleanForFirestore(value);
+      } else {
+        result[key] = value;
       }
-    });
-  }
-
-  if (parsed.orders && Array.isArray(parsed.orders)) {
-    parsed.orders.forEach((o: any) => {
-      if (o.items && Array.isArray(o.items)) {
-        o.items.forEach((item: any) => {
-          if (item.imageUrl && item.imageUrl.includes(BROKEN_IMG)) {
-            item.imageUrl = VALID_REPLACEMENT;
-            needsWrite = true;
-          }
-        });
-      }
-    });
-  }
-
-  // Normalize categories to the 6 official categories if needed
-  if (
-    !parsed.categories ||
-    parsed.categories.length === 0 ||
-    !parsed.categories.some((c: any) => c.slug === 'sunscreens')
-  ) {
-    parsed.categories = OFFICIAL_CATEGORIES;
-    needsWrite = true;
-  }
-
-  // Clean up product sizes and map any legacy categories to official ones
-  if (parsed.products && Array.isArray(parsed.products)) {
-    parsed.products.forEach((p: any) => {
-      if (p.sizes) {
-        delete p.sizes;
-        needsWrite = true;
-      }
-      if (p.category === 'Serums & Oils') {
-        p.category = 'Serums & Eye Care';
-        p.categorySlug = 'serums-eye-care';
-        needsWrite = true;
-      } else if (p.category === 'Sunscreen (Zero Cast)') {
-        p.category = 'Sunscreens';
-        p.categorySlug = 'sunscreens';
-        needsWrite = true;
-      } else if (p.category === 'Moisturizers & Creams') {
-        p.category = 'Face Moisturisers';
-        p.categorySlug = 'face-moisturisers';
-        needsWrite = true;
-      } else if (p.category === 'Cleansers & Toners') {
-        p.category = 'Cleansers & Face Washes';
-        p.categorySlug = 'cleansers-face-washes';
-        needsWrite = true;
-      } else if (p.category === 'Body Care') {
-        p.category = 'Body Care, Scrubs & Soaps';
-        p.categorySlug = 'body-care-scrubs-soaps';
-        needsWrite = true;
-      }
-    });
-  }
-
-  if (!parsed.products || !Array.isArray(parsed.products)) {
-    parsed.products = DEFAULT_PRODUCTS;
-    needsWrite = true;
-  }
-  if (!parsed.orders) {
-    parsed.orders = DEFAULT_ORDERS;
-    needsWrite = true;
-  }
-  if (!parsed.settings) {
-    parsed.settings = DEFAULT_SETTINGS;
-    needsWrite = true;
-  }
-
-  const defaultB = DEFAULT_SETTINGS.banner;
-
-  const currentBrand = (
-    parsed.settings.brandName ||
-    parsed.settings.banner?.brandName ||
-    defaultB.brandName
-  ).trim();
-
-  parsed.settings.brandName = currentBrand;
-
-  let bannerImg = parsed.settings.banner?.imageUrl;
-  if (!bannerImg || bannerImg.includes('unsplash.com')) {
-    bannerImg = '/images/banner.jpg';
-    needsWrite = true;
-  }
-
-  parsed.settings.banner = {
-    brandName: currentBrand,
-    announcementText:
-      parsed.settings.banner?.announcementText ||
-      parsed.settings.announcementText ||
-      defaultB.announcementText,
-    heading: parsed.settings.banner?.heading || defaultB.heading,
-    subheading: parsed.settings.banner?.subheading || defaultB.subheading,
-    imageUrl: bannerImg,
-  };
-
-  if (!parsed.settings.ownerWhatsApp) {
-    parsed.settings.ownerWhatsApp = DEFAULT_SETTINGS.ownerWhatsApp;
-    needsWrite = true;
-  }
-
-  if (!parsed.adminPasswordHash) {
-    parsed.adminPasswordHash = 'admin2026';
-    needsWrite = true;
-  }
-
-  if (needsWrite) {
-    writeDb(parsed);
-  }
-
-  return parsed as DatabaseSchema;
-}
-
-let lastDbMtime = 0;
-
-function ensureDb(): DatabaseSchema {
-  const primaryPath = getPrimaryDbPath();
-
-  if (fs.existsSync(primaryPath)) {
-    try {
-      const stat = fs.statSync(primaryPath);
-      if (inMemoryDb && stat.mtimeMs <= lastDbMtime) {
-        return inMemoryDb;
-      }
-      const raw = fs.readFileSync(primaryPath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.products)) {
-        lastDbMtime = stat.mtimeMs;
-        inMemoryDb = normalizeDatabase(parsed);
-        return inMemoryDb;
-      }
-    } catch (err) {
-      console.warn(`Failed reading database from ${primaryPath}:`, err);
     }
   }
-
-  // Backup check in /tmp if primary file could not be read
-  const backupPath = path.join('/tmp', 'md_store.json');
-  if (fs.existsSync(backupPath)) {
-    try {
-      const raw = fs.readFileSync(backupPath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.products)) {
-        inMemoryDb = normalizeDatabase(parsed);
-        try {
-          fs.writeFileSync(primaryPath, raw, 'utf-8');
-        } catch {}
-        return inMemoryDb;
-      }
-    } catch (err) {
-      console.warn(`Failed reading backup database from ${backupPath}:`, err);
-    }
-  }
-
-  if (inMemoryDb) {
-    return inMemoryDb;
-  }
-
-  // Fallback to defaults only if no file could be read
-  const initialData: DatabaseSchema = {
-    products: DEFAULT_PRODUCTS,
-    categories: DEFAULT_CATEGORIES,
-    orders: DEFAULT_ORDERS,
-    settings: DEFAULT_SETTINGS,
-    adminPasswordHash: 'admin2026',
-  };
-  inMemoryDb = initialData;
-  try {
-    writeDb(initialData);
-  } catch (err) {
-    console.warn('Could not write fallback initial DB:', err);
-  }
-  return inMemoryDb;
-}
-
-function writeDb(data: DatabaseSchema): void {
-  inMemoryDb = data;
-  const jsonStr = JSON.stringify(data, null, 2);
-  const primaryPath = getPrimaryDbPath();
-  const dir = path.dirname(primaryPath);
-
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  const tmpPath = `${primaryPath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`;
-  fs.writeFileSync(tmpPath, jsonStr, 'utf-8');
-  fs.renameSync(tmpPath, primaryPath);
-
-  try {
-    lastDbMtime = fs.statSync(primaryPath).mtimeMs;
-  } catch {
-    lastDbMtime = Date.now();
-  }
-
-  // Also mirror to /tmp as backup
-  try {
-    const backupPath = path.join('/tmp', 'md_store.json');
-    fs.writeFileSync(backupPath, jsonStr, 'utf-8');
-  } catch {
-    // Non-fatal backup
-  }
+  return result;
 }
 
 export const db = {
-  getProducts(): Product[] {
-    const data = ensureDb();
-    return data.products;
-  },
-  getProductById(id: string): Product | undefined {
-    const data = ensureDb();
-    return data.products.find((p) => p.id === id);
-  },
-  getProductBySlug(slug: string): Product | undefined {
-    const data = ensureDb();
-    return data.products.find((p) => p.slug === slug);
-  },
-  saveProduct(product: Product): Product {
-    const data = ensureDb();
-    const index = data.products.findIndex((p) => p.id === product.id);
-    if (index >= 0) {
-      data.products[index] = product;
-    } else {
-      data.products.unshift(product);
-    }
-    writeDb(data);
-
-    // Physical disk verification: Read the actual file from disk to guarantee persistence
-    const primaryPath = getPrimaryDbPath();
+  // PRODUCTS
+  async getProducts(): Promise<Product[]> {
     try {
-      const diskContent = fs.readFileSync(primaryPath, 'utf-8');
-      const parsed = JSON.parse(diskContent);
-      const onDisk = parsed.products.find((p: any) => p.id === product.id);
-      if (!onDisk) {
-        throw new Error(`Product ${product.id} could not be confirmed in database file after write`);
+      const snap = await getDocs(collection(firestore, 'products'));
+      if (snap.empty) {
+        // Fallback: Seed with default products if collection is completely fresh
+        const list: Product[] = [];
+        for (const p of DEFAULT_PRODUCTS) {
+          const cleaned = cleanForFirestore(p);
+          await setDoc(doc(firestore, 'products', p.id), cleaned);
+          list.push(p);
+        }
+        return list;
       }
-      return onDisk;
-    } catch (diskErr: any) {
-      throw new Error(`Database verification failed: ${diskErr?.message || 'Product not confirmed on disk'}`);
+
+      const products: Product[] = [];
+      snap.forEach((d) => {
+        products.push(d.data() as Product);
+      });
+
+      // Sort by createdAt descending
+      return products.sort((a, b) => {
+        const tA = new Date(a.createdAt || 0).getTime();
+        const tB = new Date(b.createdAt || 0).getTime();
+        return tB - tA;
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'products');
     }
   },
-  updateProduct(id: string, updates: Partial<Product>): Product | null {
-    const data = ensureDb();
-    const index = data.products.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-    const updated = {
-      ...data.products[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    data.products[index] = updated;
-    writeDb(data);
 
-    // Physical disk verification
-    const primaryPath = getPrimaryDbPath();
+  async getProductById(id: string): Promise<Product | undefined> {
     try {
-      const diskContent = fs.readFileSync(primaryPath, 'utf-8');
-      const parsed = JSON.parse(diskContent);
-      const onDisk = parsed.products.find((p: any) => p.id === id);
-      if (!onDisk) {
-        throw new Error(`Updated product ${id} could not be confirmed in database file after write`);
+      const snap = await getDoc(doc(firestore, 'products', id));
+      if (snap.exists()) {
+        return snap.data() as Product;
       }
-      return onDisk;
-    } catch (diskErr: any) {
-      throw new Error(`Database verification failed: ${diskErr?.message || 'Product update not confirmed on disk'}`);
+      return undefined;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `products/${id}`);
     }
-  },
-  deleteProduct(id: string): boolean {
-    const data = ensureDb();
-    const initialLength = data.products.length;
-    data.products = data.products.filter((p) => p.id !== id);
-    if (data.products.length !== initialLength) {
-      writeDb(data);
-      return true;
-    }
-    return false;
   },
 
-  getCategories(): Category[] {
-    const data = ensureDb();
-    return data.categories;
-  },
-  saveCategory(cat: Category): Category {
-    const data = ensureDb();
-    const index = data.categories.findIndex((c) => c.id === cat.id);
-    if (index >= 0) {
-      data.categories[index] = cat;
-    } else {
-      data.categories.push(cat);
-    }
-    writeDb(data);
-    return cat;
-  },
-  deleteCategory(id: string): boolean {
-    const data = ensureDb();
-    const prev = data.categories.length;
-    data.categories = data.categories.filter((c) => c.id !== id);
-    if (data.categories.length !== prev) {
-      writeDb(data);
-      return true;
-    }
-    return false;
-  },
-  resetOfficialCategories(): Category[] {
-    const data = ensureDb();
-    data.categories = [...OFFICIAL_CATEGORIES];
-    writeDb(data);
-    return data.categories;
-  },
-
-  getOrders(): Order[] {
-    const data = ensureDb();
-    return data.orders.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  },
-  getOrderById(id: string): Order | undefined {
-    const data = ensureDb();
-    return data.orders.find((o) => o.id === id);
-  },
-  createOrder(order: Order): Order {
-    const data = ensureDb();
-    order.items.forEach((item) => {
-      const prod = data.products.find((p) => p.id === item.productId);
-      if (prod) {
-        prod.stockQuantity = Math.max(0, prod.stockQuantity - item.quantity);
-        prod.inStock = prod.stockQuantity > 0;
+  async getProductBySlug(slug: string): Promise<Product | undefined> {
+    try {
+      const q = query(collection(firestore, 'products'), where('slug', '==', slug));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs[0].data() as Product;
       }
-    });
-
-    data.orders.unshift(order);
-    writeDb(data);
-    return order;
+      return undefined;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'products');
+    }
   },
-  updateOrderStatus(
+
+  async saveProduct(product: Product): Promise<Product> {
+    try {
+      const cleaned = cleanForFirestore({
+        ...product,
+        updatedAt: new Date().toISOString(),
+      });
+      await setDoc(doc(firestore, 'products', product.id), cleaned);
+
+      // Confirm write directly from Firestore
+      const verifiedSnap = await getDoc(doc(firestore, 'products', product.id));
+      if (!verifiedSnap.exists()) {
+        throw new Error(`Product ${product.id} could not be confirmed in Firestore after save`);
+      }
+      return verifiedSnap.data() as Product;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `products/${product.id}`);
+    }
+  },
+
+  async updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
+    try {
+      const existingSnap = await getDoc(doc(firestore, 'products', id));
+      if (!existingSnap.exists()) {
+        return null;
+      }
+      const existing = existingSnap.data() as Product;
+      const merged: Product = cleanForFirestore({
+        ...existing,
+        ...updates,
+        id,
+        updatedAt: new Date().toISOString(),
+      });
+
+      await setDoc(doc(firestore, 'products', id), merged);
+
+      const verified = await getDoc(doc(firestore, 'products', id));
+      if (!verified.exists()) {
+        throw new Error(`Updated product ${id} could not be confirmed in Firestore`);
+      }
+      return verified.data() as Product;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `products/${id}`);
+    }
+  },
+
+  async deleteProduct(id: string): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(firestore, 'products', id));
+      if (!snap.exists()) {
+        return false;
+      }
+      await deleteDoc(doc(firestore, 'products', id));
+      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
+    }
+  },
+
+  // CATEGORIES
+  async getCategories(): Promise<Category[]> {
+    try {
+      const snap = await getDocs(collection(firestore, 'categories'));
+      if (snap.empty) {
+        // Seed official categories
+        for (const c of OFFICIAL_CATEGORIES) {
+          await setDoc(doc(firestore, 'categories', c.id || c.slug), cleanForFirestore(c));
+        }
+        return [...OFFICIAL_CATEGORIES];
+      }
+
+      const list: Category[] = [];
+      snap.forEach((d) => list.push(d.data() as Category));
+      return list;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'categories');
+    }
+  },
+
+  async saveCategory(cat: Category): Promise<Category> {
+    try {
+      const cleaned = cleanForFirestore(cat);
+      const catId = cat.id || cat.slug;
+      await setDoc(doc(firestore, 'categories', catId), cleaned);
+      return cat;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `categories/${cat.id}`);
+    }
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    try {
+      await deleteDoc(doc(firestore, 'categories', id));
+      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `categories/${id}`);
+    }
+  },
+
+  async resetOfficialCategories(): Promise<Category[]> {
+    try {
+      const current = await getDocs(collection(firestore, 'categories'));
+      for (const d of current.docs) {
+        await deleteDoc(d.ref);
+      }
+      for (const c of OFFICIAL_CATEGORIES) {
+        await setDoc(doc(firestore, 'categories', c.id || c.slug), cleanForFirestore(c));
+      }
+      return [...OFFICIAL_CATEGORIES];
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'categories');
+    }
+  },
+
+  // ORDERS
+  async getOrders(): Promise<Order[]> {
+    try {
+      const snap = await getDocs(collection(firestore, 'orders'));
+      const orders: Order[] = [];
+      snap.forEach((d) => orders.push(d.data() as Order));
+      return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'orders');
+    }
+  },
+
+  async getOrderById(id: string): Promise<Order | undefined> {
+    try {
+      const snap = await getDoc(doc(firestore, 'orders', id));
+      if (snap.exists()) {
+        return snap.data() as Order;
+      }
+      return undefined;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `orders/${id}`);
+    }
+  },
+
+  async createOrder(order: Order): Promise<Order> {
+    try {
+      // Reduce stock for ordered items
+      for (const item of order.items) {
+        try {
+          const prodDoc = await getDoc(doc(firestore, 'products', item.productId));
+          if (prodDoc.exists()) {
+            const prod = prodDoc.data() as Product;
+            const newQty = Math.max(0, (prod.stockQuantity || 0) - item.quantity);
+            await setDoc(
+              doc(firestore, 'products', item.productId),
+              cleanForFirestore({
+                ...prod,
+                stockQuantity: newQty,
+                inStock: newQty > 0,
+                updatedAt: new Date().toISOString(),
+              })
+            );
+          }
+        } catch (itemErr) {
+          console.warn('Stock update note:', itemErr);
+        }
+      }
+
+      const cleaned = cleanForFirestore(order);
+      await setDoc(doc(firestore, 'orders', order.id), cleaned);
+      return order;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `orders/${order.id}`);
+    }
+  },
+
+  async updateOrderStatus(
     id: string,
     status: Order['status'],
+    paymentProof?: any,
     adminNotes?: string
-  ): Order | null {
-    const data = ensureDb();
-    const order = data.orders.find((o) => o.id === id);
-    if (!order) return null;
+  ): Promise<Order | null> {
+    try {
+      const snap = await getDoc(doc(firestore, 'orders', id));
+      if (!snap.exists()) return null;
 
-    order.status = status;
-    order.updatedAt = new Date().toISOString();
-    if (adminNotes !== undefined) {
-      order.adminNotes = adminNotes;
+      const order = snap.data() as Order;
+      const updated: Order = cleanForFirestore({
+        ...order,
+        status,
+        updatedAt: new Date().toISOString(),
+        paymentProof: paymentProof || order.paymentProof,
+        adminNotes: adminNotes !== undefined ? adminNotes : order.adminNotes,
+      });
+
+      await setDoc(doc(firestore, 'orders', id), updated);
+      return updated;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `orders/${id}`);
     }
-    writeDb(data);
-    return order;
-  },
-  updateOrderPaymentProof(
-    id: string,
-    proof: Order['paymentProof']
-  ): Order | null {
-    const data = ensureDb();
-    const order = data.orders.find((o) => o.id === id);
-    if (!order) return null;
-
-    order.paymentProof = {
-      ...order.paymentProof,
-      ...proof,
-      paidAt: proof?.paidAt || new Date().toISOString(),
-    };
-    order.updatedAt = new Date().toISOString();
-    writeDb(data);
-    return order;
   },
 
-  deleteOrder(id: string): boolean {
-    const data = ensureDb();
-    const initLen = data.orders.length;
-    data.orders = data.orders.filter((o) => o.id !== id);
-    if (data.orders.length !== initLen) {
-      writeDb(data);
+  async updateOrderPaymentProof(id: string, proof: Order['paymentProof']): Promise<Order | null> {
+    try {
+      const snap = await getDoc(doc(firestore, 'orders', id));
+      if (!snap.exists()) return null;
+
+      const order = snap.data() as Order;
+      const updated: Order = cleanForFirestore({
+        ...order,
+        paymentProof: {
+          ...order.paymentProof,
+          ...proof,
+          paidAt: proof?.paidAt || new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      });
+
+      await setDoc(doc(firestore, 'orders', id), updated);
+      return updated;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `orders/${id}`);
+    }
+  },
+
+  async deleteOrder(id: string): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(firestore, 'orders', id));
+      if (!snap.exists()) return false;
+      await deleteDoc(doc(firestore, 'orders', id));
       return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `orders/${id}`);
     }
-    return false;
   },
 
-  resetOrders(statusFilter?: string): { deletedCount: number; remainingCount: number } {
-    const data = ensureDb();
-    const initialCount = data.orders.length;
-    if (!statusFilter || statusFilter === 'all') {
-      data.orders = [];
-    } else {
-      data.orders = data.orders.filter(
-        (o) => o.status.toLowerCase() !== statusFilter.toLowerCase()
-      );
+  async resetOrders(statusFilter?: string): Promise<{ deletedCount: number; remainingCount: number }> {
+    try {
+      const snap = await getDocs(collection(firestore, 'orders'));
+      let deleted = 0;
+      let remaining = 0;
+
+      for (const d of snap.docs) {
+        const order = d.data() as Order;
+        if (!statusFilter || statusFilter === 'all' || order.status.toLowerCase() === statusFilter.toLowerCase()) {
+          await deleteDoc(d.ref);
+          deleted++;
+        } else {
+          remaining++;
+        }
+      }
+
+      return { deletedCount: deleted, remainingCount: remaining };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'orders');
     }
-    const deletedCount = initialCount - data.orders.length;
-    writeDb(data);
-    return { deletedCount, remainingCount: data.orders.length };
   },
 
-  resetSalesSummary(): { resetAt: string } {
-    const data = ensureDb();
-    const resetAt = new Date().toISOString();
-    data.settings.salesSummaryResetAt = resetAt;
-    writeDb(data);
-    return { resetAt };
+  async resetSalesSummary(): Promise<{ resetAt: string }> {
+    try {
+      const resetAt = new Date().toISOString();
+      const settingsSnap = await getDoc(doc(firestore, 'settings', 'store'));
+      const current = settingsSnap.exists() ? (settingsSnap.data() as StoreSettings) : DEFAULT_SETTINGS;
+      const updated = cleanForFirestore({
+        ...current,
+        salesSummaryResetAt: resetAt,
+      });
+      await setDoc(doc(firestore, 'settings', 'store'), updated);
+      return { resetAt };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'settings/store');
+    }
   },
 
-  restoreSalesSummary(): void {
-    const data = ensureDb();
-    delete data.settings.salesSummaryResetAt;
-    writeDb(data);
+  async restoreSalesSummary(): Promise<void> {
+    try {
+      const settingsSnap = await getDoc(doc(firestore, 'settings', 'store'));
+      if (settingsSnap.exists()) {
+        const current = settingsSnap.data() as StoreSettings;
+        delete current.salesSummaryResetAt;
+        await setDoc(doc(firestore, 'settings', 'store'), cleanForFirestore(current));
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'settings/store');
+    }
   },
 
-  getSettings(): StoreSettings {
-    const data = ensureDb();
-    return data.settings;
+  // STORE SETTINGS
+  async getSettings(): Promise<StoreSettings> {
+    try {
+      const snap = await getDoc(doc(firestore, 'settings', 'store'));
+      if (snap.exists()) {
+        const data = snap.data() as StoreSettings;
+        return {
+          brandName: data.brandName || DEFAULT_SETTINGS.brandName,
+          ownerWhatsApp: data.ownerWhatsApp || DEFAULT_SETTINGS.ownerWhatsApp,
+          bankDetails: data.bankDetails || DEFAULT_SETTINGS.bankDetails,
+          banner: data.banner || DEFAULT_SETTINGS.banner,
+          salesSummaryResetAt: data.salesSummaryResetAt,
+        };
+      }
+
+      // Initialize default settings in Firestore
+      await setDoc(doc(firestore, 'settings', 'store'), cleanForFirestore(DEFAULT_SETTINGS));
+      return { ...DEFAULT_SETTINGS };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'settings/store');
+    }
   },
-  updateSettings(settings: Partial<StoreSettings>): StoreSettings {
-    const data = ensureDb();
 
-    const brandName = (
-      settings.brandName ||
-      settings.banner?.brandName ||
-      data.settings.brandName ||
-      'MD SKINCARE HAVEN'
-    ).trim();
+  async updateSettings(settings: Partial<StoreSettings>): Promise<StoreSettings> {
+    try {
+      const current = await db.getSettings();
+      const brandName = (
+        settings.brandName ||
+        settings.banner?.brandName ||
+        current.brandName ||
+        'MD SKINCARE HAVEN'
+      ).trim();
 
-    const ownerWhatsApp = (
-      settings.ownerWhatsApp ||
-      data.settings.ownerWhatsApp ||
-      DEFAULT_SETTINGS.ownerWhatsApp
-    ).trim();
+      const ownerWhatsApp = (
+        settings.ownerWhatsApp ||
+        current.ownerWhatsApp ||
+        DEFAULT_SETTINGS.ownerWhatsApp
+      ).trim();
 
-    data.settings = {
-      ...data.settings,
-      ...settings,
-      brandName,
-      ownerWhatsApp,
-      bankDetails: {
-        ...data.settings.bankDetails,
-        ...(settings.bankDetails || {}),
-      },
-      banner: {
-        ...data.settings.banner,
-        ...(settings.banner || {}),
+      const merged: StoreSettings = cleanForFirestore({
+        ...current,
+        ...settings,
         brandName,
-        imageUrl:
-          settings.banner?.imageUrl ||
-          data.settings.banner?.imageUrl ||
-          '/images/banner.jpg',
-      },
-    };
-    writeDb(data);
-    return data.settings;
+        ownerWhatsApp,
+        bankDetails: {
+          ...current.bankDetails,
+          ...(settings.bankDetails || {}),
+        },
+        banner: {
+          ...current.banner,
+          ...(settings.banner || {}),
+          brandName,
+          imageUrl:
+            settings.banner?.imageUrl ||
+            current.banner?.imageUrl ||
+            '/images/banner.jpg',
+        },
+      });
+
+      await setDoc(doc(firestore, 'settings', 'store'), merged);
+      return merged;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'settings/store');
+    }
   },
 
-  verifyAdminPassword(password: string): boolean {
-    const data = ensureDb();
-    return data.adminPasswordHash === password;
-  },
-  updateAdminPassword(oldPass: string, newPass: string): boolean {
-    const data = ensureDb();
-    if (data.adminPasswordHash === oldPass) {
-      data.adminPasswordHash = newPass;
-      writeDb(data);
-      return true;
+  // ADMIN AUTHENTICATION
+  async verifyAdminPassword(password: string): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(firestore, 'settings', 'adminAuth'));
+      if (snap.exists()) {
+        const storedHash = snap.data().passwordHash;
+        return storedHash === password;
+      }
+      return password === 'admin2026';
+    } catch {
+      return password === 'admin2026';
     }
-    return false;
+  },
+
+  async updateAdminPassword(oldPass: string, newPass: string): Promise<boolean> {
+    try {
+      const isValid = await db.verifyAdminPassword(oldPass);
+      if (!isValid) return false;
+
+      await setDoc(doc(firestore, 'settings', 'adminAuth'), {
+        passwordHash: newPass,
+        updatedAt: new Date().toISOString(),
+      });
+      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'settings/adminAuth');
+    }
   },
 };

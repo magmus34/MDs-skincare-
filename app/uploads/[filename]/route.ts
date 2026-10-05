@@ -33,25 +33,25 @@ export async function GET(
       });
     }
 
-    // Fallback: check if we can recover the image from data/store.json
+    // Fallback: check if we can recover the image from Firestore
     try {
-      const storePath = path.join(process.cwd(), 'data', 'store.json');
-      if (fs.existsSync(storePath)) {
-        const storeData = JSON.parse(fs.readFileSync(storePath, 'utf8'));
-        const matchingProduct = (storeData.products || []).find(
-          (p: any) => p.imageUrl && p.imageUrl.includes(safeName)
-        );
-
-        if (matchingProduct?.imageUrl?.startsWith('data:image/')) {
-          const [, base64Data] = matchingProduct.imageUrl.split(',');
-          const buffer = Buffer.from(base64Data, 'base64');
-          return new NextResponse(buffer, {
-            headers: {
-              'Content-Type': 'image/jpeg',
-              'Content-Disposition': 'inline',
-              'Cache-Control': 'public, max-age=31536000, immutable',
-            },
-          });
+      const { firestore } = await import('@/lib/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+      const snap = await getDocs(collection(firestore, 'products'));
+      for (const d of snap.docs) {
+        const prod = d.data();
+        if (prod.imageUrl && prod.imageUrl.includes(safeName)) {
+          if (prod.imageUrl.startsWith('data:image/')) {
+            const [, base64Data] = prod.imageUrl.split(',');
+            const buffer = Buffer.from(base64Data, 'base64');
+            return new NextResponse(buffer, {
+              headers: {
+                'Content-Type': 'image/jpeg',
+                'Content-Disposition': 'inline',
+                'Cache-Control': 'public, max-age=31536000, immutable',
+              },
+            });
+          }
         }
       }
     } catch {}

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const isValidOld = db.verifyAdminPassword(oldPassword);
+      const isValidOld = await db.verifyAdminPassword(oldPassword);
       if (!isValidOld) {
         return NextResponse.json(
           { success: false, error: 'Current password is incorrect' },
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      db.updateAdminPassword(oldPassword, newPassword);
+      await db.updateAdminPassword(oldPassword, newPassword);
       return NextResponse.json(
         { success: true, message: 'Admin password changed successfully' },
         { headers: NO_CACHE_HEADERS }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isValid = db.verifyAdminPassword(password);
+    const isValid = await db.verifyAdminPassword(password);
     if (!isValid && password !== 'admin2026') {
       return NextResponse.json(
         { success: false, error: 'Incorrect admin password' },

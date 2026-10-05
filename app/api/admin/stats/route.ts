@@ -12,8 +12,8 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const orders = db.getOrders();
-    const settings = db.getSettings();
+    const orders = await db.getOrders();
+    const settings = await db.getSettings();
     const resetAt = settings.salesSummaryResetAt;
 
     let relevantOrders = orders;
@@ -79,7 +79,7 @@ export async function GET() {
 
 export async function POST() {
   try {
-    const { resetAt } = db.resetSalesSummary();
+    const { resetAt } = await db.resetSalesSummary();
     return NextResponse.json(
       {
         success: true,
@@ -98,7 +98,7 @@ export async function POST() {
 
 export async function DELETE() {
   try {
-    db.restoreSalesSummary();
+    await db.restoreSalesSummary();
     return NextResponse.json(
       {
         success: true,

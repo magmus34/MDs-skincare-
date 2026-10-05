@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection testing
+    match /test/{testId} {
+      allow read: if true;
+    }
+
+    // Products: Catalog is publicly readable & listable; writable for store management
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(productId);
+    }
+
+    // Categories: Categories are publicly readable & listable; writable for store management
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(categoryId);
+    }
+
+    // Orders: Customers create orders at checkout; admin reads/updates order status
+    match /orders/{orderId} {
+      allow get, list: if true;
+      allow create: if isValidId(orderId);
+      allow update, delete: if isValidId(orderId);
+    }
+
+    // Settings: Store settings and bank transfer information
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow write: if isValidId(settingId);
+    }
+  }
+}

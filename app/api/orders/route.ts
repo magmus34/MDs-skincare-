@@ -14,7 +14,7 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const orders = db.getOrders();
+    const orders = await db.getOrders();
     return NextResponse.json(
       { success: true, orders },
       { headers: NO_CACHE_HEADERS }
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const settings = db.getSettings();
+    const settings = await db.getSettings();
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       updatedAt: now.toISOString(),
     };
 
-    const savedOrder = db.createOrder(newOrder);
+    const savedOrder = await db.createOrder(newOrder);
 
     const whatsAppUrl = getOrderWhatsAppUrl(
       savedOrder,
@@ -127,7 +127,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const updated = db.updateOrderStatus(id, status as OrderStatus, paymentProof);
+    const updated = await db.updateOrderStatus(id, status as OrderStatus, paymentProof, adminNotes);
 
     if (!updated) {
       return NextResponse.json(
@@ -156,7 +156,7 @@ export async function DELETE(req: NextRequest) {
     const status = searchParams.get('status');
 
     if (reset === 'true') {
-      const result = db.resetOrders(status || undefined);
+      const result = await db.resetOrders(status || undefined);
       return NextResponse.json(
         {
           success: true,
@@ -174,7 +174,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const deleted = db.deleteOrder(id);
+    const deleted = await db.deleteOrder(id);
 
     if (!deleted) {
       return NextResponse.json(

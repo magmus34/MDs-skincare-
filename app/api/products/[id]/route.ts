@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const product = db.getProductById(id) || db.getProductBySlug(id);
+    const product = (await db.getProductById(id)) || (await db.getProductBySlug(id));
 
     if (!product) {
       return NextResponse.json(
@@ -67,7 +67,7 @@ export async function PUT(
       body.imageUrl = persistImageIfDataUrl(body.imageUrl);
     }
 
-    const updated = db.updateProduct(id, body);
+    const updated = await db.updateProduct(id, body);
 
     if (!updated) {
       return NextResponse.json(
@@ -94,7 +94,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const deleted = db.deleteProduct(id);
+    const deleted = await db.deleteProduct(id);
 
     if (!deleted) {
       return NextResponse.json(

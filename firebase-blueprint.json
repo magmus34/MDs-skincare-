@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Botanical skincare product catalog item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "categorySlug": { "type": "string" },
+        "stockQuantity": { "type": "number" },
+        "inStock": { "type": "boolean" },
+        "imageUrl": { "type": "string" },
+        "badge": { "type": "string" },
+        "skinType": { "type": "string" },
+        "volume": { "type": "string" },
+        "howToUse": { "type": "string" },
+        "ingredients": { "type": "string" },
+        "featured": { "type": "boolean" },
+        "isPopular": { "type": "boolean" },
+        "isNewArrival": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "price"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "displayOrder": { "type": "number" },
+        "iconName": { "type": "string" }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customer": { "type": "object" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "bankDetails": { "type": "object" },
+        "paymentProof": { "type": "object" },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customer", "items", "totalAmount", "status"]
+    },
+    "StoreSettings": {
+      "title": "StoreSettings",
+      "description": "Store configuration and bank payment settings",
+      "type": "object",
+      "properties": {
+        "brandName": { "type": "string" },
+        "ownerWhatsApp": { "type": "string" },
+        "bankDetails": { "type": "object" },
+        "banner": { "type": "object" },
+        "salesSummaryResetAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Storefront products collection"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Storefront product categories"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer checkout orders"
+    },
+    "/settings/{settingId}": {
+      "schema": "StoreSettings",
+      "description": "Storefront settings and bank details"
+    }
+  }
+}

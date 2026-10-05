@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const popular = searchParams.get('popular');
     const newArrival = searchParams.get('new');
 
-    let products = db.getProducts();
+    let products = await db.getProducts();
 
     if (category && category !== 'all') {
       products = products.filter(
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    const saved = db.saveProduct(newProduct);
+    const saved = await db.saveProduct(newProduct);
 
     return NextResponse.json(
       {

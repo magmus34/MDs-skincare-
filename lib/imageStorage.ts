@@ -61,20 +61,26 @@ export async function saveUploadedFile(
   originalFilename?: string,
   mimeType?: string
 ): Promise<string> {
-  ensureUploadDir();
+  try {
+    ensureUploadDir();
 
-  let ext = 'jpg';
-  if (originalFilename && path.extname(originalFilename)) {
-    ext = path.extname(originalFilename).replace('.', '').toLowerCase();
-  } else if (mimeType) {
-    const parts = mimeType.split('/');
-    if (parts[1]) ext = parts[1].toLowerCase();
+    let ext = 'jpg';
+    if (originalFilename && path.extname(originalFilename)) {
+      ext = path.extname(originalFilename).replace('.', '').toLowerCase();
+    } else if (mimeType) {
+      const parts = mimeType.split('/');
+      if (parts[1]) ext = parts[1].toLowerCase();
+    }
+    if (ext === 'jpeg') ext = 'jpg';
+
+    const filename = `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const filePath = path.join(UPLOAD_DIR, filename);
+
+    await fs.promises.writeFile(filePath, buffer);
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.warn('Filesystem is read-only, falling back to data URL for uploaded image:', err);
+    const mime = mimeType || 'image/jpeg';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
   }
-  if (ext === 'jpeg') ext = 'jpg';
-
-  const filename = `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const filePath = path.join(UPLOAD_DIR, filename);
-
-  await fs.promises.writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
 }

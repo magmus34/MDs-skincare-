@@ -13,7 +13,7 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const categories = db.getCategories();
+    const categories = await db.getCategories();
     return NextResponse.json(
       { success: true, categories },
       { headers: NO_CACHE_HEADERS }
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       description: description?.trim() || undefined,
     };
 
-    const saved = db.saveCategory(newCategory);
+    const saved = await db.saveCategory(newCategory);
 
     return NextResponse.json(
       { success: true, category: saved },
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT() {
   try {
-    const categories = db.resetOfficialCategories();
+    const categories = await db.resetOfficialCategories();
     return NextResponse.json(
       { success: true, categories },
       { headers: NO_CACHE_HEADERS }
@@ -92,7 +92,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const deleted = db.deleteCategory(id);
+    const deleted = await db.deleteCategory(id);
 
     if (!deleted) {
       return NextResponse.json(

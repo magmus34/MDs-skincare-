@@ -12,7 +12,7 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const settings = db.getSettings();
+    const settings = await db.getSettings();
     return NextResponse.json(
       { success: true, settings },
       { headers: NO_CACHE_HEADERS }
@@ -32,7 +32,7 @@ export async function PUT(req: NextRequest) {
       const { persistImageIfDataUrl } = await import('@/lib/imageStorage');
       body.banner.imageUrl = persistImageIfDataUrl(body.banner.imageUrl);
     }
-    const updated = db.updateSettings(body);
+    const updated = await db.updateSettings(body);
     return NextResponse.json(
       { success: true, settings: updated },
       { headers: NO_CACHE_HEADERS }
