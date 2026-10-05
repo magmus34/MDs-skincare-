@@ -1,0 +1,6 @@
+{
+  "name": "MD Skincare Haven",
+  "description": "Premium botanical skincare store with persistent product management, direct bank transfer checkout, and WhatsApp order confirmation.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
