@@ -39,10 +39,22 @@ export default function ShoppingPage() {
       try {
         setLoading(true);
         const t = Date.now();
+        const safeFetchJson = async (url: string) => {
+          try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) return { success: false };
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return { success: false };
+            return await res.json();
+          } catch {
+            return { success: false };
+          }
+        };
+
         const [prodRes, catRes, setRes] = await Promise.all([
-          fetch(`/api/products?_t=${t}`, { cache: 'no-store' }).then((r) => r.json()),
-          fetch(`/api/categories?_t=${t}`, { cache: 'no-store' }).then((r) => r.json()),
-          fetch(`/api/settings?_t=${t}`, { cache: 'no-store' }).then((r) => r.json()),
+          safeFetchJson(`/api/products?_t=${t}`),
+          safeFetchJson(`/api/categories?_t=${t}`),
+          safeFetchJson(`/api/settings?_t=${t}`),
         ]);
 
         if (!active) return;
