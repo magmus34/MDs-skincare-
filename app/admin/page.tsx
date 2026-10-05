@@ -196,6 +196,20 @@ export default function AdminDashboardPage() {
         }
       };
       loadAllData();
+
+      const handleCatalogSync = () => {
+        loadAllData();
+      };
+      window.addEventListener('focus', handleCatalogSync);
+      window.addEventListener('storage', handleCatalogSync);
+      window.addEventListener('md_catalog_updated', handleCatalogSync);
+
+      return () => {
+        active = false;
+        window.removeEventListener('focus', handleCatalogSync);
+        window.removeEventListener('storage', handleCatalogSync);
+        window.removeEventListener('md_catalog_updated', handleCatalogSync);
+      };
     }
     return () => {
       active = false;
@@ -377,8 +391,60 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle file selection from admin device with fast client-side compression and server persistence
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper to compress and upload image via client-side canvas fallback if needed
+  const compressAndUploadViaCanvas = async (file: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') return resolve(null);
+        const img = new window.Image();
+        img.onload = async () => {
+          try {
+            const maxDim = 1000;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(null);
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+            const uploadRes = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dataUrl }),
+            });
+            const data = await uploadRes.json().catch(() => null);
+            if (uploadRes.ok && data?.success && data?.url) {
+              resolve(data.url);
+            } else {
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = reader.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle file selection from admin device with direct multipart upload and instant preview
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -390,126 +456,147 @@ export default function AdminDashboardPage() {
       /\.(jpe?g|png|webp|gif|heic|heif|bmp|svg|avif)$/i.test(file.name);
 
     if (!isImage) {
-      showToast('Please select an image file (JPG, PNG, WEBP, etc.)', true);
+      showToast('Please select a valid image file (JPG, PNG, WEBP, etc.)', true);
       return;
     }
 
     setUploadingImage(true);
     setProductSaveError(null);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        setUploadingImage(false);
-        return;
-      }
+    // Provide instant local object URL preview so the user immediately sees the selected image
+    try {
+      const localPreview = URL.createObjectURL(file);
+      setProductFormData((prev) => ({
+        ...prev,
+        imageUrl: localPreview,
+      }));
+    } catch {}
 
-      const img = new window.Image();
-      img.onload = () => {
-        try {
-          const maxDim = 800;
-          let w = img.naturalWidth || img.width;
-          let h = img.naturalHeight || img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.round((h * maxDim) / w);
-              w = maxDim;
-            } else {
-              w = Math.round((w * maxDim) / h);
-              h = maxDim;
-            }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, w, h);
-            const compressed = canvas.toDataURL('image/jpeg', 0.82);
-            setProductFormData((prev) => ({
-              ...prev,
-              imageUrl: compressed,
-            }));
-            showToast('Image attached and optimized successfully.');
+    try {
+      // 1. Direct multipart/form-data upload to /api/upload
+      const formData = new FormData();
+      formData.append('file', file);
 
-            // Also upload to /api/upload to write to public/uploads/ in background
-            fetch('/api/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ dataUrl: compressed }),
-            }).catch((err) => console.warn('Background upload note:', err));
-          } else {
-            setProductFormData((prev) => ({
-              ...prev,
-              imageUrl: reader.result as string,
-            }));
-            showToast('Image attached successfully.');
-          }
-        } catch {
-          setProductFormData((prev) => ({
-            ...prev,
-            imageUrl: reader.result as string,
-          }));
-          showToast('Image attached successfully.');
-        } finally {
-          setUploadingImage(false);
-        }
-      };
-      img.onerror = () => {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success && data?.url) {
         setProductFormData((prev) => ({
           ...prev,
-          imageUrl: reader.result as string,
+          imageUrl: data.url,
         }));
-        showToast('Image attached successfully.');
-        setUploadingImage(false);
-      };
-      img.src = reader.result;
-    };
-    reader.onerror = () => {
-      showToast('Failed to read image from device.', true);
+        showToast('Image uploaded and saved successfully.');
+      } else {
+        // 2. Client-side canvas fallback
+        const fallbackUrl = await compressAndUploadViaCanvas(file);
+        if (fallbackUrl) {
+          setProductFormData((prev) => ({
+            ...prev,
+            imageUrl: fallbackUrl,
+          }));
+          showToast('Image optimized and saved successfully.');
+        } else {
+          showToast(data?.error || 'Failed to upload image. You can try another photo or save without image.', true);
+        }
+      }
+    } catch (err: any) {
+      console.warn('Direct upload warning, trying canvas fallback:', err);
+      try {
+        const fallbackUrl = await compressAndUploadViaCanvas(file);
+        if (fallbackUrl) {
+          setProductFormData((prev) => ({
+            ...prev,
+            imageUrl: fallbackUrl,
+          }));
+          showToast('Image optimized and saved successfully.');
+        } else {
+          showToast('Failed to upload image. You can try another photo or save without image.', true);
+        }
+      } catch {
+        showToast('Failed to upload image. You can save without image or try another file.', true);
+      }
+    } finally {
       setUploadingImage(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
-  // Save product
+  // Save product with full end-to-end database verification
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setProductSaveError(null);
+
+    if (uploadingImage) {
+      const waitMsg = 'Please wait for the image upload to complete before saving.';
+      setProductSaveError(waitMsg);
+      showToast(waitMsg, true);
+      return;
+    }
+
+    // 1. Sanitize & validate required fields in JavaScript
+    const trimmedName = (productFormData.name || '').trim();
+    if (!trimmedName) {
+      const err = 'Please enter a product name.';
+      setProductSaveError(err);
+      showToast(err, true);
+      return;
+    }
+
+    // Clean price (remove any commas, currency symbols, spaces)
+    const cleanPriceStr = String(productFormData.price ?? '').replace(/[^0-9.]/g, '');
+    const numPrice = parseFloat(cleanPriceStr);
+    if (isNaN(numPrice) || numPrice <= 0) {
+      const err = 'Please enter a valid price in Naira (₦) greater than 0.';
+      setProductSaveError(err);
+      showToast(err, true);
+      return;
+    }
+
+    // Clean optional original price
+    const cleanOrigStr = String(productFormData.originalPrice ?? '').replace(/[^0-9.]/g, '');
+    const numOrigPrice =
+      cleanOrigStr && !isNaN(parseFloat(cleanOrigStr)) && parseFloat(cleanOrigStr) > 0
+        ? parseFloat(cleanOrigStr)
+        : undefined;
+
+    // Clean stock quantity (defaults to 25 if blank)
+    const cleanStockStr = String(productFormData.stockQuantity ?? '').replace(/[^0-9]/g, '');
+    const numStock = cleanStockStr !== '' ? parseInt(cleanStockStr, 10) : 25;
+
+    // Clean description (provides professional fallback if blank)
+    const trimmedDesc = (productFormData.description || '').trim();
+    const finalDescription =
+      trimmedDesc ||
+      `${trimmedName} - Premium botanical skincare formulation for healthy, radiant, and glowing melanin skin.`;
+
+    const activeCategories = categories.length > 0 ? categories : OFFICIAL_CATEGORIES;
+    const selectedCategoryName = productFormData.category || activeCategories[0]?.name || 'Sunscreens';
+    const selectedCat = activeCategories.find((c) => c.name === selectedCategoryName) || activeCategories[0];
+
+    // If imageUrl starts with blob:, the upload may not have finished or failed
+    let finalImageUrl = productFormData.imageUrl?.trim() || '';
+    if (finalImageUrl.startsWith('blob:')) {
+      finalImageUrl = '';
+    }
+
+    const payload = {
+      ...productFormData,
+      imageUrl: finalImageUrl,
+      name: trimmedName,
+      price: numPrice,
+      originalPrice: numOrigPrice,
+      stockQuantity: numStock,
+      inStock: numStock > 0,
+      description: finalDescription,
+      category: selectedCategoryName,
+      categorySlug: selectedCat?.slug || selectedCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    };
+
     setSavingProduct(true);
     try {
-      const activeCategories = categories.length > 0 ? categories : OFFICIAL_CATEGORIES;
-      const selectedCategoryName = productFormData.category || activeCategories[0]?.name || 'Sunscreens';
-      const selectedCat = activeCategories.find((c) => c.name === selectedCategoryName) || activeCategories[0];
-
-      // Product image is optional: use trimmed URL or empty string if not provided
-      const finalImageUrl = productFormData.imageUrl?.trim() || '';
-
-      const trimmedName = (productFormData.name || '').trim();
-      const numPrice = Number(productFormData.price);
-      const numStock = Number(productFormData.stockQuantity);
-
-      if (!trimmedName) {
-        throw new Error('Please enter a product name.');
-      }
-      if (isNaN(numPrice) || numPrice <= 0) {
-        throw new Error('Please enter a valid price in Naira (₦) greater than 0.');
-      }
-      if (isNaN(numStock) || numStock < 0) {
-        throw new Error('Please enter a valid stock quantity (0 or more).');
-      }
-
-      const payload = {
-        ...productFormData,
-        imageUrl: finalImageUrl,
-        name: trimmedName,
-        price: numPrice,
-        stockQuantity: numStock,
-        inStock: numStock > 0,
-        category: selectedCategoryName,
-        categorySlug: selectedCat?.slug || selectedCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      };
-
       const isEditing = Boolean(editingProduct?.id);
       const url = isEditing ? `/api/products/${editingProduct?.id}` : '/api/products';
       const method = isEditing ? 'PUT' : 'POST';
@@ -519,30 +606,33 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to save product to database');
+
+      const data = await res.json().catch(() => null);
+
+      // Verify that database response was returned with success AND a confirmed product object with an ID
+      if (!res.ok || !data?.success || !data?.product?.id) {
+        throw new Error(data?.error || `Server responded with status ${res.status}: Failed to persist to database.`);
       }
 
-      // 1. Update state immediately with confirmed database product
-      if (data.product) {
-        setProducts((prev) => {
-          if (isEditing) {
-            return prev.map((p) => (p.id === data.product.id ? data.product : p));
-          } else {
-            return [data.product, ...prev.filter((p) => p.id !== data.product.id)];
-          }
-        });
-      }
+      const confirmedProduct = data.product;
 
-      // 2. Re-fetch all data from database to ensure absolute consistency
+      // 1. Update admin state immediately with the confirmed product from database
+      setProducts((prev) => {
+        if (isEditing) {
+          return prev.map((p) => (p.id === confirmedProduct.id ? confirmedProduct : p));
+        } else {
+          return [confirmedProduct, ...prev.filter((p) => p.id !== confirmedProduct.id)];
+        }
+      });
+
+      // 2. Synchronize from server to guarantee full database alignment
       try {
         await refreshData();
-      } catch (e) {
-        console.warn('refreshData notice:', e);
+      } catch (refreshErr) {
+        console.warn('refreshData note:', refreshErr);
       }
 
-      // 3. Broadcast synchronization to any open shopping page tabs
+      // 3. Broadcast synchronization event to shopping page and open tabs
       try {
         if (typeof window !== 'undefined') {
           localStorage.setItem('md_catalog_sync', Date.now().toString());
@@ -552,7 +642,7 @@ export default function AdminDashboardPage() {
         console.warn('Sync broadcast warning:', syncErr);
       }
 
-      // 4. Success: close modal, clear editing state, reset form, and display success toast
+      // 4. ONLY AFTER DATABASE CONFIRMS: Close modal and reset form
       setIsProductModalOpen(false);
       setEditingProduct(null);
       setProductSaveError(null);
@@ -571,7 +661,8 @@ export default function AdminDashboardPage() {
         inStock: true,
       });
 
-      showToast(isEditing ? 'Product updated successfully.' : 'Product added successfully and published.');
+      // 5. Show verified success notification ONLY AFTER DATABASE CONFIRMS
+      showToast(isEditing ? 'Product updated and verified in database.' : 'Product added and saved in database successfully.');
     } catch (err: any) {
       // KEEP FORM OPEN, DO NOT CLEAR DATA, DISPLAY ACTUAL ERROR
       const errorMsg = err?.message || 'Failed to save product to database';
@@ -1771,7 +1862,7 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-            <form onSubmit={handleSaveProduct} className="space-y-3.5">
+            <form noValidate onSubmit={handleSaveProduct} className="space-y-3.5">
               <div>
                 <label className="block font-bold text-gray-700 mb-1">
                   Product Name <span className="text-rose-500">*</span>

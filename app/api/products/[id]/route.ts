@@ -44,6 +44,23 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await req.json();
+    if (body.name !== undefined && !String(body.name).trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Product name cannot be empty' },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
+
+    if (body.price !== undefined) {
+      const num = Number(body.price);
+      if (isNaN(num) || num <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'Please enter a valid product price in Naira (₦)' },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+      body.price = num;
+    }
 
     if (body.imageUrl) {
       const { persistImageIfDataUrl } = await import('@/lib/imageStorage');

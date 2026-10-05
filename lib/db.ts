@@ -2,22 +2,17 @@ import fs from 'fs';
 import path from 'path';
 import { Product, Category, Order, StoreSettings, OFFICIAL_CATEGORIES } from './types';
 
-function getKnownDbPaths(): string[] {
-  return Array.from(
-    new Set([
-      '/app/applet/data/store.json',
-      path.join(process.cwd(), 'data', 'store.json'),
-      '/data/store.json',
-      '/tmp/md_store.json',
-    ])
-  );
-}
-
 function getPrimaryDbPath(): string {
   if (fs.existsSync('/app/applet/data/store.json')) {
     return '/app/applet/data/store.json';
   }
   return path.join(process.cwd(), 'data', 'store.json');
+}
+
+function getKnownDbPaths(): string[] {
+  const primary = getPrimaryDbPath();
+  const backup = path.join('/tmp', 'md_store.json');
+  return Array.from(new Set([primary, backup]));
 }
 
 export interface DatabaseSchema {
@@ -386,36 +381,41 @@ function normalizeDatabase(parsed: any): DatabaseSchema {
 let lastDbMtime = 0;
 
 function ensureDb(): DatabaseSchema {
-  const searchPaths = getKnownDbPaths();
+  const primaryPath = getPrimaryDbPath();
 
-  let bestFile: { path: string; mtime: number } | null = null;
-  for (const p of searchPaths) {
+  if (fs.existsSync(primaryPath)) {
     try {
-      if (fs.existsSync(p)) {
-        const stat = fs.statSync(p);
-        if (!bestFile || stat.mtimeMs > bestFile.mtime) {
-          bestFile = { path: p, mtime: stat.mtimeMs };
-        }
+      const stat = fs.statSync(primaryPath);
+      if (inMemoryDb && stat.mtimeMs <= lastDbMtime) {
+        return inMemoryDb;
       }
-    } catch {
-      // ignore check error
-    }
-  }
-
-  if (bestFile) {
-    if (inMemoryDb && bestFile.mtime <= lastDbMtime) {
-      return inMemoryDb;
-    }
-    try {
-      const raw = fs.readFileSync(bestFile.path, 'utf-8');
+      const raw = fs.readFileSync(primaryPath, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.products)) {
-        lastDbMtime = bestFile.mtime;
+        lastDbMtime = stat.mtimeMs;
         inMemoryDb = normalizeDatabase(parsed);
         return inMemoryDb;
       }
     } catch (err) {
-      console.warn(`Failed reading database from ${bestFile.path}:`, err);
+      console.warn(`Failed reading database from ${primaryPath}:`, err);
+    }
+  }
+
+  // Backup check in /tmp if primary file could not be read
+  const backupPath = path.join('/tmp', 'md_store.json');
+  if (fs.existsSync(backupPath)) {
+    try {
+      const raw = fs.readFileSync(backupPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.products)) {
+        inMemoryDb = normalizeDatabase(parsed);
+        try {
+          fs.writeFileSync(primaryPath, raw, 'utf-8');
+        } catch {}
+        return inMemoryDb;
+      }
+    } catch (err) {
+      console.warn(`Failed reading backup database from ${backupPath}:`, err);
     }
   }
 
@@ -443,38 +443,29 @@ function ensureDb(): DatabaseSchema {
 function writeDb(data: DatabaseSchema): void {
   inMemoryDb = data;
   const jsonStr = JSON.stringify(data, null, 2);
-  let writtenSuccessfully = false;
-  let lastError: any = null;
+  const primaryPath = getPrimaryDbPath();
+  const dir = path.dirname(primaryPath);
 
-  const targetPaths = getKnownDbPaths();
-
-  for (const filePath of targetPaths) {
-    try {
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      const tmpPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`;
-      fs.writeFileSync(tmpPath, jsonStr, 'utf-8');
-      fs.renameSync(tmpPath, filePath);
-      writtenSuccessfully = true;
-    } catch (err) {
-      lastError = err;
-      console.warn(`Could not write to ${filePath}:`, err);
-    }
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 
-  if (!writtenSuccessfully) {
-    throw new Error(`Failed to persist database: ${lastError?.message || 'Write failed'}`);
-  }
+  const tmpPath = `${primaryPath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`;
+  fs.writeFileSync(tmpPath, jsonStr, 'utf-8');
+  fs.renameSync(tmpPath, primaryPath);
 
   try {
-    const primary = getPrimaryDbPath();
-    if (fs.existsSync(primary)) {
-      lastDbMtime = fs.statSync(primary).mtimeMs;
-    }
+    lastDbMtime = fs.statSync(primaryPath).mtimeMs;
   } catch {
     lastDbMtime = Date.now();
+  }
+
+  // Also mirror to /tmp as backup
+  try {
+    const backupPath = path.join('/tmp', 'md_store.json');
+    fs.writeFileSync(backupPath, jsonStr, 'utf-8');
+  } catch {
+    // Non-fatal backup
   }
 }
 
@@ -500,7 +491,20 @@ export const db = {
       data.products.unshift(product);
     }
     writeDb(data);
-    return product;
+
+    // Physical disk verification: Read the actual file from disk to guarantee persistence
+    const primaryPath = getPrimaryDbPath();
+    try {
+      const diskContent = fs.readFileSync(primaryPath, 'utf-8');
+      const parsed = JSON.parse(diskContent);
+      const onDisk = parsed.products.find((p: any) => p.id === product.id);
+      if (!onDisk) {
+        throw new Error(`Product ${product.id} could not be confirmed in database file after write`);
+      }
+      return onDisk;
+    } catch (diskErr: any) {
+      throw new Error(`Database verification failed: ${diskErr?.message || 'Product not confirmed on disk'}`);
+    }
   },
   updateProduct(id: string, updates: Partial<Product>): Product | null {
     const data = ensureDb();
@@ -513,7 +517,20 @@ export const db = {
     };
     data.products[index] = updated;
     writeDb(data);
-    return updated;
+
+    // Physical disk verification
+    const primaryPath = getPrimaryDbPath();
+    try {
+      const diskContent = fs.readFileSync(primaryPath, 'utf-8');
+      const parsed = JSON.parse(diskContent);
+      const onDisk = parsed.products.find((p: any) => p.id === id);
+      if (!onDisk) {
+        throw new Error(`Updated product ${id} could not be confirmed in database file after write`);
+      }
+      return onDisk;
+    } catch (diskErr: any) {
+      throw new Error(`Database verification failed: ${diskErr?.message || 'Product update not confirmed on disk'}`);
+    }
   },
   deleteProduct(id: string): boolean {
     const data = ensureDb();
