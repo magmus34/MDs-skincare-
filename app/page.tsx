@@ -164,7 +164,7 @@ export default function ShoppingPage() {
               sizes="(max-width: 768px) 100vw, 800px"
               className="object-cover object-center brightness-90"
               referrerPolicy="no-referrer"
-              unoptimized={bannerData.imageUrl?.startsWith('data:')}
+              unoptimized={true}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/80 via-emerald-950/30 to-transparent flex flex-col justify-end p-4 sm:p-6 text-white">
               <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-emerald-300">

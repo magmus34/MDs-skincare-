@@ -94,7 +94,7 @@ export const CartPopup: React.FC<CartPopupProps> = ({
                       sizes="64px"
                       className="object-cover"
                       referrerPolicy="no-referrer"
-                      unoptimized={product.imageUrl.startsWith('data:')}
+                      unoptimized={true}
                     />
                   ) : (
                     <Package className="w-6 h-6 text-stone-400" />

@@ -30,6 +30,11 @@ export const ProductDetailPopup: React.FC<ProductDetailPopupProps> = ({
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [product?.id]);
 
   if (!product) return null;
 
@@ -67,7 +72,7 @@ export const ProductDetailPopup: React.FC<ProductDetailPopupProps> = ({
         <div className="overflow-y-auto flex-1 p-4 sm:p-6 space-y-4">
           {/* Main Product Image */}
           <div className="relative w-full aspect-4/3 rounded-2xl overflow-hidden bg-stone-100">
-            {product.imageUrl ? (
+            {product.imageUrl && !imgError ? (
               <Image
                 src={product.imageUrl}
                 alt={product.name}
@@ -75,7 +80,8 @@ export const ProductDetailPopup: React.FC<ProductDetailPopupProps> = ({
                 sizes="(max-width: 640px) 100vw, 600px"
                 className="object-cover object-center"
                 referrerPolicy="no-referrer"
-                unoptimized={product.imageUrl.startsWith('data:')}
+                unoptimized={true}
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 bg-stone-100/90 gap-2 p-6 text-center">
