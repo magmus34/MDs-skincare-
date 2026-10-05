@@ -39,8 +39,16 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Main Bar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
         {/* Brand Title */}
-        <div className="flex items-center gap-2">
-          <span className="font-serif text-lg sm:text-xl font-bold tracking-tight text-emerald-900">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-white border border-stone-200/80 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/permanent-banner.svg"
+              alt="MD Skincare Haven"
+              className="w-full h-full object-contain p-0.5"
+            />
+          </div>
+          <span className="font-serif text-base sm:text-xl font-bold tracking-tight text-emerald-950">
             {brandName}
           </span>
           <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-full">

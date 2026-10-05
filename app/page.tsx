@@ -12,6 +12,7 @@ import { CartPopup } from '@/components/CartPopup';
 import { CheckoutPopup } from '@/components/CheckoutPopup';
 import { BankTransferPopup } from '@/components/BankTransferPopup';
 import { WhatsAppFloatingButton } from '@/components/WhatsAppFloatingButton';
+import { BrandHeroBanner } from '@/components/BrandHeroBanner';
 import { RefreshCw, Sparkles, Filter, Lock } from 'lucide-react';
 
 export default function ShoppingPage() {
@@ -153,34 +154,8 @@ export default function ShoppingPage() {
 
       {/* 2. Main Shopping Content */}
       <main className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-4">
-        {/* Customizable Store Banner (Clean image banner with brand name) */}
-        {bannerData?.imageUrl && (
-          <div className="relative w-full h-36 sm:h-52 rounded-2xl overflow-hidden shadow-xs border border-gray-100 bg-emerald-950">
-            <Image
-              src={bannerData.imageUrl}
-              alt={bannerData?.heading || storeBrandName}
-              fill
-              priority
-              sizes="(max-width: 768px) 100vw, 800px"
-              className="object-cover object-center brightness-90"
-              referrerPolicy="no-referrer"
-              unoptimized={true}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/80 via-emerald-950/30 to-transparent flex flex-col justify-end p-4 sm:p-6 text-white">
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-emerald-300">
-                {bannerData?.brandName || storeBrandName}
-              </span>
-              <h1 className="font-serif text-lg sm:text-2xl md:text-3xl font-bold leading-tight">
-                {bannerData?.heading || 'Healthy, Radiant Melanin Glow'}
-              </h1>
-              {bannerData?.subheading && (
-                <p className="text-[11px] sm:text-xs text-emerald-100/90 max-w-lg mt-0.5 line-clamp-2">
-                  {bannerData.subheading}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Permanent Official Brand Banner */}
+        <BrandHeroBanner />
 
         {/* Categories Bar */}
         {categories.length > 0 && (

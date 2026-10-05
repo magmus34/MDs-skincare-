@@ -85,7 +85,6 @@ export default function AdminDashboardPage() {
 
   // Product modal & device upload
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const bannerFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -469,46 +468,6 @@ export default function AdminDashboardPage() {
     reader.onerror = () => {
       showToast('Failed to read image from device.', true);
       setUploadingImage(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (res.ok && data.success && data.url && settingsForm) {
-        setSettingsForm({
-          ...settingsForm,
-          banner: {
-            ...settingsForm.banner,
-            imageUrl: data.url,
-          },
-        });
-        showToast('Banner image uploaded successfully.');
-        return;
-      }
-    } catch (err) {
-      console.warn('Banner upload failed, falling back:', err);
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string' && settingsForm) {
-        setSettingsForm({
-          ...settingsForm,
-          banner: {
-            ...settingsForm.banner,
-            imageUrl: reader.result,
-          },
-        });
-      }
     };
     reader.readAsDataURL(file);
   };
@@ -944,7 +903,7 @@ export default function AdminDashboardPage() {
             }`}
           >
             <Landmark className="w-4 h-4" />
-            <span>Bank & Store Banner</span>
+            <span>Bank & Store Settings</span>
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -1544,11 +1503,11 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Store Banner & Brand Name */}
+                  {/* Store Brand & Contact Information */}
                   <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-200 space-y-4 shadow-xs text-xs">
                     <div className="flex items-center gap-2 pb-2 border-b border-gray-100 text-gray-900 font-bold">
                       <Sparkles className="w-4 h-4 text-emerald-700" />
-                      <span>Store Banner & Brand Name</span>
+                      <span>Store Brand & Contact Information</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1562,13 +1521,6 @@ export default function AdminDashboardPage() {
                             setSettingsForm({
                               ...settingsForm,
                               brandName: e.target.value,
-                              banner: {
-                                brandName: e.target.value,
-                                announcementText: settingsForm?.banner?.announcementText || '',
-                                heading: settingsForm?.banner?.heading || '',
-                                subheading: settingsForm?.banner?.subheading || '',
-                                imageUrl: settingsForm?.banner?.imageUrl || '',
-                              },
                             })
                           }
                           className="w-full px-3 py-2 bg-stone-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold"
@@ -1591,103 +1543,34 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-bold text-gray-700 mb-1">Banner Heading</label>
-                        <input
-                          type="text"
-                          value={settingsForm?.banner?.heading || ''}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              banner: {
-                                brandName: settingsForm?.banner?.brandName || settingsForm?.brandName || '',
-                                announcementText: settingsForm?.banner?.announcementText || '',
-                                heading: e.target.value,
-                                subheading: settingsForm?.banner?.subheading || '',
-                                imageUrl: settingsForm?.banner?.imageUrl || '',
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 bg-stone-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold"
-                        />
+                    {/* Permanent Store Banner Notice & Preview */}
+                    <div className="pt-2 border-t border-gray-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-gray-800 flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Official Store Banner (Permanent)</span>
+                        </label>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[9px] uppercase tracking-wider">
+                          Locked Permanent Identity
+                        </span>
                       </div>
 
-                      <div>
-                        <label className="block font-bold text-gray-700 mb-1">Banner Subheading</label>
-                        <input
-                          type="text"
-                          value={settingsForm?.banner?.subheading || ''}
-                          onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              banner: {
-                                brandName: settingsForm?.banner?.brandName || settingsForm?.brandName || '',
-                                announcementText: settingsForm?.banner?.announcementText || '',
-                                heading: settingsForm?.banner?.heading || '',
-                                subheading: e.target.value,
-                                imageUrl: settingsForm?.banner?.imageUrl || '',
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 bg-stone-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-gray-700 mb-1">
-                        Banner Image
-                      </label>
-                      <input
-                        type="file"
-                        ref={bannerFileInputRef}
-                        accept="image/*"
-                        onChange={handleBannerFileChange}
-                        className="hidden"
-                      />
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-stone-50 border border-gray-200 rounded-2xl">
-                        {settingsForm?.banner?.imageUrl ? (
-                          <div className="relative w-28 h-16 rounded-xl overflow-hidden bg-emerald-950 shrink-0 border border-gray-200">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={settingsForm.banner.imageUrl}
-                              alt="Store Banner"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : null}
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <span className="text-xs font-bold text-gray-900 block truncate">
-                            {settingsForm?.banner?.imageUrl || '/images/banner.jpg'}
-                          </span>
-                          <p className="text-[11px] text-gray-500">
-                            The visual banner displayed across the top of your store.
-                          </p>
+                      <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-stone-50 border border-gray-200 rounded-2xl">
+                        <div className="w-48 sm:w-56 h-20 sm:h-24 bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center p-2 shadow-2xs shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="/images/permanent-banner.svg"
+                            alt="MD Skincare Haven Official Banner"
+                            className="w-full h-full object-contain"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => bannerFileInputRef.current?.click()}
-                            className="px-3 py-1.5 rounded-xl bg-white border border-gray-300 hover:bg-stone-100 text-gray-800 font-bold text-xs shadow-2xs transition"
-                          >
-                            Upload From Device
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSettingsForm({
-                                ...settingsForm,
-                                banner: {
-                                  ...settingsForm.banner,
-                                  imageUrl: '/images/banner.jpg',
-                                },
-                              })
-                            }
-                            className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition"
-                          >
-                            Use Default Banner
-                          </button>
+                        <div className="space-y-1 text-center sm:text-left">
+                          <h4 className="font-bold text-gray-900 text-xs">
+                            MD Skincare Haven Official Identity
+                          </h4>
+                          <p className="text-[11px] text-gray-500 leading-relaxed">
+                            Your official brand identity graphic is permanently locked as the hero banner across your storefront. It cannot be altered from this panel.
+                          </p>
                         </div>
                       </div>
                     </div>

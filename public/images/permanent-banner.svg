@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 360" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&amp;family=Montserrat:wght@400;500;600&amp;display=swap');
+      .banner-monogram {
+        font-family: 'Playfair Display', Didot, 'Bodoni MT', Baskerville, Georgia, serif;
+        font-weight: 900;
+        font-size: 240px;
+        fill: #0a0a0a;
+        text-anchor: middle;
+        letter-spacing: -10px;
+      }
+      .banner-subtext {
+        font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 20px;
+        font-weight: 500;
+        fill: #0a0a0a;
+        text-anchor: middle;
+        letter-spacing: 0.38em;
+      }
+    </style>
+  </defs>
+
+  <!-- Clean Background -->
+  <rect width="800" height="360" fill="#FFFFFF" />
+
+  <!-- Monogram Top & Bottom Half -->
+  <g transform="translate(400, 245)">
+    <text class="banner-monogram">MD</text>
+  </g>
+
+  <!-- Clean Horizontal Cutout Strip -->
+  <rect x="70" y="152" width="660" height="54" fill="#FFFFFF" />
+
+  <!-- Top Divider Line -->
+  <line x1="90" y1="152" x2="710" y2="152" stroke="#0a0a0a" stroke-width="2.5" stroke-linecap="square" />
+
+  <!-- Center Brand Text -->
+  <text class="banner-subtext" x="403" y="187">SKINCARE HAVEN</text>
+
+  <!-- Bottom Divider Line -->
+  <line x1="90" y1="206" x2="710" y2="206" stroke="#0a0a0a" stroke-width="2.5" stroke-linecap="square" />
+</svg>
