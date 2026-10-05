@@ -378,8 +378,8 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle file selection from admin device with direct upload to /api/upload
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file selection from admin device with fast client-side compression and server persistence
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -398,56 +398,79 @@ export default function AdminDashboardPage() {
     setUploadingImage(true);
     setProductSaveError(null);
 
-    // Instant local preview
-    if (typeof window !== 'undefined' && window.URL && window.URL.createObjectURL) {
-      const localBlob = URL.createObjectURL(file);
-      setProductFormData((prev) => ({
-        ...prev,
-        imageUrl: localBlob,
-      }));
-    }
-
-    try {
-      // 1. Direct upload to /api/upload via multipart/form-data
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success && data.url) {
-        setProductFormData((prev) => ({
-          ...prev,
-          imageUrl: data.url,
-        }));
-        showToast('Image uploaded and attached successfully.');
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
         setUploadingImage(false);
         return;
       }
-      throw new Error(data.error || 'Server upload failed, using local reader');
-    } catch (uploadErr) {
-      console.warn('Direct upload error, falling back to local reader:', uploadErr);
-      // Fallback: Read as data URL
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
+
+      const img = new window.Image();
+      img.onload = () => {
+        try {
+          const maxDim = 800;
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/jpeg', 0.82);
+            setProductFormData((prev) => ({
+              ...prev,
+              imageUrl: compressed,
+            }));
+            showToast('Image attached and optimized successfully.');
+
+            // Also upload to /api/upload to write to public/uploads/ in background
+            fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dataUrl: compressed }),
+            }).catch((err) => console.warn('Background upload note:', err));
+          } else {
+            setProductFormData((prev) => ({
+              ...prev,
+              imageUrl: reader.result as string,
+            }));
+            showToast('Image attached successfully.');
+          }
+        } catch {
           setProductFormData((prev) => ({
             ...prev,
             imageUrl: reader.result as string,
           }));
-          showToast('Image attached locally from device.');
+          showToast('Image attached successfully.');
+        } finally {
+          setUploadingImage(false);
         }
+      };
+      img.onerror = () => {
+        setProductFormData((prev) => ({
+          ...prev,
+          imageUrl: reader.result as string,
+        }));
+        showToast('Image attached successfully.');
         setUploadingImage(false);
       };
-      reader.onerror = () => {
-        showToast('Failed to read image from device.', true);
-        setUploadingImage(false);
-      };
-      reader.readAsDataURL(file);
-    }
+      img.src = reader.result;
+    };
+    reader.onerror = () => {
+      showToast('Failed to read image from device.', true);
+      setUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

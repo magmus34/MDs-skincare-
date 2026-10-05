@@ -45,6 +45,13 @@ export function persistImageIfDataUrl(imageUrl: string | undefined | null): stri
     const filePath = path.join(UPLOAD_DIR, filename);
 
     fs.writeFileSync(filePath, buffer);
+
+    // If the data URL is reasonably sized (under 300KB), preserve it directly in the database
+    // so it is 100% resilient across ephemeral container restarts, multi-replica servers, and CDNs!
+    if (trimmed.length < 300 * 1024) {
+      return trimmed;
+    }
+
     return `/uploads/${filename}`;
   } catch (err) {
     console.error('Failed to convert data URL to file:', err);
